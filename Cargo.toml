@@ -1,0 +1,13 @@
+[package]
+name = "msdos_time"
+version = "0.1.0"
+authors = ["Mathijs van de Nes <git@mathijs.vd-nes.nl>"]
+license = "MIT"
+
+[lib]
+name = "msdos_time"
+
+[dependencies]
+time = "*"
+winapi = "*"
+kernel32-sys = "0.1.2"
