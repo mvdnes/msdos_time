@@ -38,14 +38,40 @@ impl TmMsDosExt for Tm {
 #[cfg(not(windows))]
 mod sys {
     use super::MsDosDateTime;
-    use time::Tm;
+    use time::{self, Tm};
+    use std::io;
 
     pub fn msdos_to_tm(ms: MsDosDateTime) -> Result<Tm, io::Error> {
-        unimplemented!()
+        let seconds = (ms.timepart & 0b0000000000011111) << 1;
+        let minutes = (ms.timepart & 0b0000011111100000) >> 5;
+        let hours =   (ms.timepart & 0b1111100000000000) >> 11;
+        let days =    (ms.datepart & 0b0000000000011111) >> 0;
+        let months =  (ms.datepart & 0b0000000111100000) >> 5;
+        let years =   (ms.datepart & 0b1111111000000000) >> 9;
+
+        // Month range: Dos [1..12], Tm [0..11]
+        // Year zero: Dos 1980, Tm 1900
+
+        let tm = Tm {
+            tm_sec: seconds as i32,
+            tm_min: minutes as i32,
+            tm_hour: hours as i32,
+            tm_mday: days as i32,
+            tm_mon: months as i32 - 1,
+            tm_year: years as i32 + 80,
+            ..time::empty_tm()
+        };
+
+        // Re-parse the possibly incorrect timestamp to get a correct one.
+        // This ensures every value will be in range
+        // TODO: Check if this will only panic on Windows, or also other platforms
+        Ok(time::at_utc(tm.to_timespec()))
     }
 
     pub fn tm_to_msdos(tm: &Tm) -> Result<MsDosDateTime, io::Error> {
-        unimplemented!()
+        let timepart = ((tm.tm_sec >> 1) | (tm.tm_min << 5) | (tm.tm_hour << 11)) as u16;
+        let datepart = (tm.tm_mday | ((tm.tm_mon + 1) << 5) | ((tm.tm_year - 80) << 9)) as u16;
+        Ok(MsDosDateTime { datepart: datepart, timepart: timepart })
     }
 }
 
@@ -131,7 +157,8 @@ mod test {
     #[test]
     fn dos_zero() {
         // The 0 date is not a correct msdos date
-        assert!(Tm::from_msdos(MsDosDateTime::new(0, 0)).is_err());
+        // We assert here that it does not panic. What it will return is undefined.
+        let _ = Tm::from_msdos(MsDosDateTime::new(0, 0));
     }
 
     #[test]
