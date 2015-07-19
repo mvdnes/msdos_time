@@ -4,52 +4,59 @@ extern crate time;
 
 use time::Tm;
 
-pub struct MsDosTime {
+#[derive(Copy, Clone, Debug)]
+pub struct MsDosDateTime {
     pub datepart: u16,
     pub timepart: u16,
 }
 
-impl MsDosTime {
-    pub fn new(date: u16, time: u16) -> MsDosTime {
-        MsDosTime {
+impl MsDosDateTime {
+    pub fn new(date: u16, time: u16) -> MsDosDateTime {
+        MsDosDateTime {
             datepart: date,
             timepart: time,
         }
     }
+}
 
-    pub fn to_tm(&self) -> Option<Tm> {
-        sys::msdos_to_tm(self)
+pub trait TmMsDosExt {
+    fn to_msdos(&self) -> MsDosDateTime;
+    fn from_msdos(MsDosDateTime) -> Option<Self>;
+}
+
+impl TmMsDosExt for Tm {
+    fn to_msdos(&self) -> MsDosDateTime {
+        sys::tm_to_msdos(self)
     }
-
-    pub fn from_tm(tm: &Tm) -> MsDosTime {
-        sys::tm_to_msdos(tm)
+    fn from_msdos(ms: MsDosDateTime) -> Option<Self> {
+        sys::msdos_to_tm(ms)
     }
 }
 
 #[cfg(not(windows))]
 mod sys {
-    use super::MsDosTime;
+    use super::MsDosDateTime;
     use time::Tm;
 
-    pub fn msdos_to_tm(ms: &MsDosTime) -> Option<Tm> {
+    pub fn msdos_to_tm(ms: MsDosDateTime) -> Option<Tm> {
         unimplemented!()
     }
 
-    pub fn tm_to_msdos(tm: &Tm) -> MsDosTime {
+    pub fn tm_to_msdos(tm: &Tm) -> MsDosDateTime {
         unimplemented!()
     }
 }
 
 #[cfg(windows)]
 mod sys {
-    use super::MsDosTime;
+    use super::MsDosDateTime;
     use time::Tm;
 
-    pub fn msdos_to_tm(ms: &MsDosTime) -> Option<Tm> {
+    pub fn msdos_to_tm(ms: MsDosDateTime) -> Option<Tm> {
         unimplemented!()
     }
 
-    pub fn tm_to_msdos(tm: &Tm) -> MsDosTime {
+    pub fn tm_to_msdos(tm: &Tm) -> MsDosDateTime {
         unimplemented!()
     }
 }
@@ -75,20 +82,20 @@ mod test {
     #[test]
     fn dos_zero() {
         // The 0 date is not a correct msdos date
-        assert!(MsDosTime::new(0, 0).to_tm().is_none());
+        assert!(Tm::from_msdos(MsDosDateTime::new(0, 0)).is_none());
     }
 
     #[test]
     fn dos_smallest() {
         // This is the actual smallest date possible
-        let tm = MsDosTime::new(0, 0b100001).to_tm().unwrap();
+        let tm = Tm::from_msdos(MsDosDateTime::new(0, 0b100001)).unwrap();
         check_date(tm, 1, 1, 1980);
         check_time(tm, 0, 0, 0);
     }
 
     #[test]
     fn dos_today() {
-        let tm = MsDosTime::new(0b01001_100000_10101, 0b0100011_0110_11110).to_tm().unwrap();
+        let tm = Tm::from_msdos(MsDosDateTime::new(0b01001_100000_10101, 0b0100011_0110_11110)).unwrap();
         check_date(tm, 30, 6, 2015);
         check_time(tm, 9, 32, 42);
     }
@@ -104,7 +111,7 @@ mod test {
             tm_sec: 0,
             ..time::empty_tm()
         };
-        let ms = MsDosTime::from_tm(&tm);
+        let ms = tm.to_msdos();
         assert_eq!(ms.datepart, 0b100001);
         assert_eq!(ms.timepart, 0);
     }
@@ -120,7 +127,7 @@ mod test {
             tm_sec: 42,
             ..time::empty_tm()
         };
-        let ms = MsDosTime::from_tm(&tm);
+        let ms = tm.to_msdos();
         assert_eq!(ms.datepart, 0b0100011_0110_11110);
         assert_eq!(ms.timepart, 0b01001_100000_10101);
     }
