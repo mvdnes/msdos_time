@@ -2,6 +2,7 @@ extern crate time;
 #[cfg(windows)] extern crate kernel32;
 #[cfg(windows)] extern crate winapi;
 
+use std::io;
 use time::Tm;
 
 #[derive(Copy, Clone, Debug)]
@@ -11,7 +12,7 @@ pub struct MsDosDateTime {
 }
 
 impl MsDosDateTime {
-    pub fn new(date: u16, time: u16) -> MsDosDateTime {
+    pub fn new(time: u16, date: u16) -> MsDosDateTime {
         MsDosDateTime {
             datepart: date,
             timepart: time,
@@ -20,15 +21,16 @@ impl MsDosDateTime {
 }
 
 pub trait TmMsDosExt {
-    fn to_msdos(&self) -> MsDosDateTime;
-    fn from_msdos(MsDosDateTime) -> Option<Self>;
+    fn to_msdos(&self) -> Result<MsDosDateTime, io::Error>;
+    fn from_msdos(MsDosDateTime) -> Result<Self, io::Error>;
 }
 
 impl TmMsDosExt for Tm {
-    fn to_msdos(&self) -> MsDosDateTime {
+    fn to_msdos(&self) -> Result<MsDosDateTime, io::Error> {
         sys::tm_to_msdos(self)
     }
-    fn from_msdos(ms: MsDosDateTime) -> Option<Self> {
+
+    fn from_msdos(ms: MsDosDateTime) -> Result<Self, io::Error> {
         sys::msdos_to_tm(ms)
     }
 }
@@ -38,11 +40,11 @@ mod sys {
     use super::MsDosDateTime;
     use time::Tm;
 
-    pub fn msdos_to_tm(ms: MsDosDateTime) -> Option<Tm> {
+    pub fn msdos_to_tm(ms: MsDosDateTime) -> Result<Tm, io::Error> {
         unimplemented!()
     }
 
-    pub fn tm_to_msdos(tm: &Tm) -> MsDosDateTime {
+    pub fn tm_to_msdos(tm: &Tm) -> Result<MsDosDateTime, io::Error> {
         unimplemented!()
     }
 }
@@ -50,14 +52,61 @@ mod sys {
 #[cfg(windows)]
 mod sys {
     use super::MsDosDateTime;
-    use time::Tm;
+    use time::{self, Tm};
+    use winapi::*;
+    use kernel32::*;
+    use std::io;
 
-    pub fn msdos_to_tm(ms: MsDosDateTime) -> Option<Tm> {
-        unimplemented!()
+    pub fn msdos_to_tm(ms: MsDosDateTime) -> Result<Tm, io::Error> {
+        let datepart: WORD = ms.datepart;
+        let timepart: WORD = ms.timepart;
+        let mut filetime: FILETIME = unsafe { ::std::mem::zeroed() };
+        let mut systemtime: SYSTEMTIME = unsafe { ::std::mem::zeroed() };
+
+        if unsafe { DosDateTimeToFileTime(datepart, timepart, &mut filetime) } == 0 {
+            return Err(io::Error::last_os_error());
+        }
+
+        if unsafe { FileTimeToSystemTime(&filetime, &mut systemtime) } == 0 {
+            return Err(io::Error::last_os_error());
+        }
+
+        Ok(Tm {
+            tm_sec: systemtime.wSecond as i32,
+            tm_min: systemtime.wMinute as i32,
+            tm_hour: systemtime.wHour as i32,
+            tm_mday: systemtime.wDay as i32,
+            tm_wday: systemtime.wDayOfWeek as i32,
+            tm_mon: (systemtime.wMonth - 1) as i32,
+            tm_year: (systemtime.wYear - 1900) as i32,
+            ..time::empty_tm()
+        })
     }
 
-    pub fn tm_to_msdos(tm: &Tm) -> MsDosDateTime {
-        unimplemented!()
+    pub fn tm_to_msdos(tm: &Tm) -> Result<MsDosDateTime, io::Error> {
+        let systemtime = SYSTEMTIME {
+            wYear: (tm.tm_year + 1900) as WORD,
+            wMonth: (tm.tm_mon + 1) as WORD,
+            wDayOfWeek: tm.tm_wday as WORD,
+            wDay: tm.tm_mday as WORD,
+            wHour: tm.tm_hour as WORD,
+            wMinute: tm.tm_min as WORD,
+            wSecond: tm.tm_sec as WORD,
+            wMilliseconds: 0,
+        };
+        let mut filetime = unsafe { ::std::mem::zeroed() };
+        let mut datepart : WORD = 0;
+        let mut timepart : WORD = 0;
+
+        if unsafe { SystemTimeToFileTime(&systemtime, &mut filetime) } == 0 {
+            return Err(io::Error::last_os_error());
+        }
+
+        if unsafe { FileTimeToDosDateTime(&filetime, &mut datepart, &mut timepart) } == 0 {
+            return Err(io::Error::last_os_error());
+        }
+
+        Ok(MsDosDateTime { datepart: datepart, timepart: timepart })
     }
 }
 
@@ -82,7 +131,7 @@ mod test {
     #[test]
     fn dos_zero() {
         // The 0 date is not a correct msdos date
-        assert!(Tm::from_msdos(MsDosDateTime::new(0, 0)).is_none());
+        assert!(Tm::from_msdos(MsDosDateTime::new(0, 0)).is_err());
     }
 
     #[test]
@@ -111,7 +160,7 @@ mod test {
             tm_sec: 0,
             ..time::empty_tm()
         };
-        let ms = tm.to_msdos();
+        let ms = tm.to_msdos().unwrap();
         assert_eq!(ms.datepart, 0b100001);
         assert_eq!(ms.timepart, 0);
     }
@@ -127,7 +176,7 @@ mod test {
             tm_sec: 42,
             ..time::empty_tm()
         };
-        let ms = tm.to_msdos();
+        let ms = tm.to_msdos().unwrap();
         assert_eq!(ms.datepart, 0b0100011_0110_11110);
         assert_eq!(ms.timepart, 0b01001_100000_10101);
     }
