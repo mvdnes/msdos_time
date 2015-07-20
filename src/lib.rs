@@ -1,3 +1,10 @@
+#![warn(missing_docs)]
+
+//! This crate converts a `Tm` struct to an `MsDosDateTime` and vice-versa
+//!
+//! MsDosDateTime is based on a FAT datetime and is a compact representation of a date.
+//! It is currently mostly used in zip files.
+
 extern crate time;
 #[cfg(windows)] extern crate kernel32;
 #[cfg(windows)] extern crate winapi;
@@ -5,13 +12,17 @@ extern crate time;
 use std::io;
 use time::Tm;
 
+/// Struct representing the date and time part of an MsDos datetime
 #[derive(Copy, Clone, Debug)]
 pub struct MsDosDateTime {
+    /// Part representing the date
     pub datepart: u16,
+    /// Part representing the time
     pub timepart: u16,
 }
 
 impl MsDosDateTime {
+    /// Constructor of an MsDos datetime, from the raw representation
     pub fn new(time: u16, date: u16) -> MsDosDateTime {
         MsDosDateTime {
             datepart: date,
@@ -20,8 +31,11 @@ impl MsDosDateTime {
     }
 }
 
+/// Trait to convert a time representation to and from a MsDosDateTime
 pub trait TmMsDosExt {
+    /// Convert a value to MsDosDateTime
     fn to_msdos(&self) -> Result<MsDosDateTime, io::Error>;
+    /// Construct a value from an MsDosDateTime
     fn from_msdos(MsDosDateTime) -> Result<Self, io::Error>;
 }
 
