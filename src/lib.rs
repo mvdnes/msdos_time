@@ -32,7 +32,7 @@ impl MsDosDateTime {
 }
 
 /// Trait to convert a time representation to and from a MsDosDateTime
-pub trait TmMsDosExt {
+pub trait TmMsDosExt : Sized {
     /// Convert a value to MsDosDateTime
     fn to_msdos(&self) -> Result<MsDosDateTime, io::Error>;
     /// Construct a value from an MsDosDateTime
