@@ -2,7 +2,7 @@
 name = "msdos_time"
 version = "0.1.3"
 authors = ["Mathijs van de Nes <git@mathijs.vd-nes.nl>"]
-license = "MIT"
+license = "MIT OR Apache-2.0"
 description = """
 Converts an MsDosDateTime (FAT time) to a Tm value
 """
