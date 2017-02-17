@@ -14,5 +14,7 @@ name = "msdos_time"
 
 [dependencies]
 time = "0.1"
+
+[target.'cfg(windows)'.dependencies]
 winapi = "0.2"
 kernel32-sys = "0.2"
