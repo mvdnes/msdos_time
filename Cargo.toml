@@ -1,6 +1,6 @@
 [package]
 name = "msdos_time"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Mathijs van de Nes <git@mathijs.vd-nes.nl>"]
 license = "MIT OR Apache-2.0"
 description = """
