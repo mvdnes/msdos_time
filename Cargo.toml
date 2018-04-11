@@ -16,5 +16,4 @@ name = "msdos_time"
 time = "0.1"
 
 [target.'cfg(windows)'.dependencies]
-winapi = "0.2"
-kernel32-sys = "0.2"
+winapi = { version = "0.3", features = ["winbase", "timezoneapi"] }
